@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Codex Limits Mini
 // @namespace    alirezadigi.chatgpt.codex-limits
-// @version      0.14.1
+// @version      0.14.2
 // @description  Shows the remaining 5-hour and weekly limits in the ChatGPT sidebar.
 // @license      MIT
 // @match        https://chatgpt.com/*
@@ -25,6 +25,8 @@
 
   // Change to 'horizontal' to show 5h and Weekly side by side.
   const LIMITS_LAYOUT = 'vertical';
+  // Applies only to the vertical layout; keeps the labels and percentages readable.
+  const VERTICAL_DENSITY = 'compact'; // 'compact' or 'comfortable'
 
   const CONFIG = Object.freeze({
     USAGE_PATH: '/backend-api/wham/usage',
@@ -97,6 +99,11 @@
       #${ROW_ID}[data-clm-layout="vertical"] .clm-icon { margin-top:1px; }
       #${ROW_ID}[data-clm-layout="vertical"] .clm-values { grid-template-columns:minmax(0,1fr); gap:10px; }
       #${ROW_ID}[data-clm-layout="vertical"] .clm-limit + .clm-limit { padding-top:10px; border-top:1px solid rgba(127,127,127,.16); }
+      #${ROW_ID}[data-clm-layout="vertical"][data-clm-density="compact"] { padding-block:7px; }
+      #${ROW_ID}[data-clm-layout="vertical"][data-clm-density="compact"] .clm-values { gap:6px; }
+      #${ROW_ID}[data-clm-layout="vertical"][data-clm-density="compact"] .clm-limit + .clm-limit { padding-top:6px; }
+      #${ROW_ID}[data-clm-layout="vertical"][data-clm-density="compact"] .clm-progress { height:3px; margin-top:4px; }
+      #${ROW_ID}[data-clm-layout="vertical"][data-clm-density="compact"] .clm-reset { margin-top:3px; }
       #${ROW_ID} .clm-limit { display:flex; flex-direction:column; align-items:stretch; min-width:0; line-height:1.15; white-space:nowrap; --clm-accent:#10a37f; }
       #${ROW_ID} .clm-limit[data-tone="low"] { --clm-accent:#d97706; }
       #${ROW_ID} .clm-limit[data-tone="critical"] { --clm-accent:#dc2626; }
@@ -236,6 +243,7 @@
     row.classList.remove('ce-nav-trigger-collapsed', 'clm-collapsed');
     row.dataset.clmMode = mode;
     row.dataset.clmLayout = LIMITS_LAYOUT === 'horizontal' ? 'horizontal' : 'vertical';
+    row.dataset.clmDensity = VERTICAL_DENSITY === 'comfortable' ? 'comfortable' : 'compact';
   }
 
   function createUi(target) {
@@ -700,6 +708,6 @@
   addInterval(() => fetchUsage(false), CONFIG.REFRESH_MS);
   addInterval(render, CONFIG.COUNTDOWN_MS);
 
-  window[RUNTIME_KEY] = Object.freeze({ version: '0.14.1', destroy });
+  window[RUNTIME_KEY] = Object.freeze({ version: '0.14.2', destroy });
   reconcile();
 })();

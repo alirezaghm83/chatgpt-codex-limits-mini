@@ -47,6 +47,12 @@ const LIMITS_LAYOUT = 'horizontal'; // 'vertical' or 'horizontal'
 
 In vertical mode, the order is always **5h** followed by **Weekly**.
 
+The vertical layout is compact by default, while retaining the same readable labels and percentages. To restore more breathing room, change:
+
+```js
+const VERTICAL_DENSITY = 'comfortable'; // 'compact' or 'comfortable'
+```
+
 ### Manual install
 
 1. Install Tampermonkey or another compatible userscript manager.
