@@ -11,6 +11,7 @@ A lightweight Tampermonkey userscript that shows the remaining **5-hour** and **
 - Shows the remaining percentage in bold for the 5-hour and weekly windows
 - Uses the full Exporter-style sidebar width with larger, higher-contrast typography
 - Shows a remaining-capacity progress bar for each window, with green/amber/red states
+- Supports configurable vertical or horizontal limit layout; vertical keeps Weekly below 5h
 - Shows a muted live reset countdown under each limit (`↻ 2h 14m`, `↻ 3d 8h`)
 - Refreshes usage automatically every 2 minutes
 - Updates countdowns locally without extra API requests
@@ -35,6 +36,16 @@ A lightweight Tampermonkey userscript that shows the remaining **5-hour** and **
 Open the link above with Tampermonkey installed. Tampermonkey should recognize the `.user.js` file and show its installation screen.
 
 The script declares the GitHub Raw URL as both `@downloadURL` and `@updateURL`, so compatible userscript managers can detect future version bumps pushed to `main`.
+
+### Layout
+
+The default layout is vertical for clearer separation between the two progress bars. To place the limits side by side, change this setting near the top of the userscript:
+
+```js
+const LIMITS_LAYOUT = 'horizontal'; // 'vertical' or 'horizontal'
+```
+
+In vertical mode, the order is always **5h** followed by **Weekly**.
 
 ### Manual install
 

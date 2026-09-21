@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Codex Limits Mini
 // @namespace    alirezadigi.chatgpt.codex-limits
-// @version      0.13.2
+// @version      0.14.0
 // @description  Shows the remaining 5-hour and weekly limits in the ChatGPT sidebar.
 // @license      MIT
 // @match        https://chatgpt.com/*
@@ -22,6 +22,9 @@
   const PROFILE_SELECTOR = '[data-testid="accounts-profile-button"]';
   const EXPORTER_SELECTOR = '.ce-nav-trigger';
   const MOUNT_SELECTOR = `${PROFILE_SELECTOR}, ${EXPORTER_SELECTOR}`;
+
+  // Change to 'horizontal' to show 5h and Weekly side by side.
+  const LIMITS_LAYOUT = 'vertical';
 
   const CONFIG = Object.freeze({
     USAGE_PATH: '/backend-api/wham/usage',
@@ -88,7 +91,12 @@
       #${ROW_ID} .clm-content { display:flex; align-items:center; gap:12px; min-width:0; width:100%; }
       #${ROW_ID} .clm-icon { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; width:20px; height:20px; opacity:.9; }
       #${ROW_ID} .clm-icon svg { width:20px; height:20px; }
-      #${ROW_ID} .clm-values { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:start; gap:14px; min-width:0; width:100%; font-variant-numeric:tabular-nums; }
+      #${ROW_ID} .clm-values { display:grid; align-items:start; min-width:0; width:100%; font-variant-numeric:tabular-nums; }
+      #${ROW_ID}[data-clm-layout="horizontal"] .clm-values { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; }
+      #${ROW_ID}[data-clm-layout="vertical"] .clm-content { align-items:flex-start; }
+      #${ROW_ID}[data-clm-layout="vertical"] .clm-icon { margin-top:1px; }
+      #${ROW_ID}[data-clm-layout="vertical"] .clm-values { grid-template-columns:minmax(0,1fr); gap:10px; }
+      #${ROW_ID}[data-clm-layout="vertical"] .clm-limit + .clm-limit { padding-top:10px; border-top:1px solid rgba(127,127,127,.16); }
       #${ROW_ID} .clm-limit { display:flex; flex-direction:column; align-items:stretch; min-width:0; line-height:1.15; white-space:nowrap; --clm-accent:#10a37f; }
       #${ROW_ID} .clm-limit[data-tone="low"] { --clm-accent:#d97706; }
       #${ROW_ID} .clm-limit[data-tone="critical"] { --clm-accent:#dc2626; }
@@ -227,6 +235,7 @@
     row.classList.add('clm-row');
     row.classList.remove('ce-nav-trigger-collapsed', 'clm-collapsed');
     row.dataset.clmMode = mode;
+    row.dataset.clmLayout = LIMITS_LAYOUT === 'horizontal' ? 'horizontal' : 'vertical';
   }
 
   function createUi(target) {
@@ -691,6 +700,6 @@
   addInterval(() => fetchUsage(false), CONFIG.REFRESH_MS);
   addInterval(render, CONFIG.COUNTDOWN_MS);
 
-  window[RUNTIME_KEY] = Object.freeze({ version: '0.13.2', destroy });
+  window[RUNTIME_KEY] = Object.freeze({ version: '0.14.0', destroy });
   reconcile();
 })();

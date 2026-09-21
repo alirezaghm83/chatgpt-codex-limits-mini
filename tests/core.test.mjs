@@ -45,13 +45,18 @@ function loadCore() {
 }
 
 test('userscript metadata and anti-regression invariants', () => {
-  assert.match(source, /\/\/ @version\s+0\.13\.2/);
+  assert.match(source, /\/\/ @version\s+0\.14\.0/);
   assert.match(source, /@icon\s+data:image\/png;base64,/);
   assert.match(source, /window\[RUNTIME_KEY\]\?\.destroy\?\.\(\)/);
   assert.match(source, /document\.createElement\('button'\)/);
   assert.doesNotMatch(source, /cloneNode\s*\(/);
   assert.doesNotMatch(source, /innerHTML\s*=\s*html/);
   assert.match(source, /className = 'clm-progress'/);
+  assert.match(source, /const LIMITS_LAYOUT = 'vertical'/);
+  assert.match(source, /row\.dataset\.clmLayout = LIMITS_LAYOUT === 'horizontal'/);
+  assert.match(source, /values\.append\(five\.root, week\.root\)/);
+  assert.match(source, /data-clm-layout="vertical"/);
+  assert.match(source, /data-clm-layout="horizontal"/);
 });
 
 test('embedded icon exactly matches the checked-in 128x128 favicon', async () => {
