@@ -45,7 +45,7 @@ function loadCore() {
 }
 
 test('userscript metadata and anti-regression invariants', () => {
-  assert.match(source, /\/\/ @version\s+0\.13\.0/);
+  assert.match(source, /\/\/ @version\s+0\.13\.1/);
   assert.match(source, /@icon\s+data:image\/png;base64,/);
   assert.match(source, /window\[RUNTIME_KEY\]\?\.destroy\?\.\(\)/);
   assert.match(source, /document\.createElement\('button'\)/);
@@ -54,14 +54,31 @@ test('userscript metadata and anti-regression invariants', () => {
   assert.match(source, /className = 'clm-progress'/);
 });
 
-test('embedded icon is a complete 128x128 PNG', () => {
+test('embedded icon exactly matches the checked-in 128x128 favicon', async () => {
   const encoded = source.match(/\/\/ @icon\s+data:image\/png;base64,([^\r\n]+)/)?.[1];
   assert.ok(encoded, 'embedded icon data must exist');
   const image = Buffer.from(encoded, 'base64');
+  const favicon = await readFile(new URL('../assets/favicon-128.png', import.meta.url));
   assert.deepEqual([...image.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
   assert.equal(image.readUInt32BE(16), 128);
   assert.equal(image.readUInt32BE(20), 128);
-  assert.equal(image.length, 15_008);
+  assert.equal(image.length, 16_887);
+  assert.deepEqual(image, favicon);
+});
+
+test('project icon and favicon variants have their intended PNG dimensions', async () => {
+  const assets = [
+    ['project-icon.png', 1254],
+    ['favicon-128.png', 128],
+    ['favicon-32.png', 32],
+  ];
+
+  for (const [filename, size] of assets) {
+    const image = await readFile(new URL(`../assets/${filename}`, import.meta.url));
+    assert.deepEqual([...image.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+    assert.equal(image.readUInt32BE(16), size, `${filename} width`);
+    assert.equal(image.readUInt32BE(20), size, `${filename} height`);
+  }
 });
 
 test('remaining percentages are rounded without losing integers', () => {

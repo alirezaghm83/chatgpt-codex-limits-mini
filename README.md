@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/icon-128.png" width="96" height="96" alt="Usage Limits Mini icon">
+  <img src="assets/project-icon.png" width="160" height="160" alt="ChatGPT Codex Limits Mini icon">
 </p>
 
 # ChatGPT Codex Limits Mini
@@ -23,7 +23,8 @@ A lightweight Tampermonkey userscript that shows the remaining **5-hour** and **
 - Filters DOM mutations so normal ChatGPT message streaming does not trigger reconciliation
 - Cleans up timers, observers, and in-flight requests if the userscript is reloaded
 - Caches the session token until shortly before expiry and retries once after an authentication failure
-- Embeds the 128×128 PNG icon directly in userscript metadata, avoiding external icon-fetch and cache failures
+- Uses the project artwork consistently in the README and favicon assets
+- Embeds the exact 128×128 favicon directly in userscript metadata, avoiding external icon-fetch and cache failures
 
 ## Installation
 
