@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Codex Limits Mini
 // @namespace    alirezadigi.chatgpt.codex-limits
-// @version      0.14.0
+// @version      0.14.1
 // @description  Shows the remaining 5-hour and weekly limits in the ChatGPT sidebar.
 // @license      MIT
 // @match        https://chatgpt.com/*
@@ -700,6 +700,6 @@
   addInterval(() => fetchUsage(false), CONFIG.REFRESH_MS);
   addInterval(render, CONFIG.COUNTDOWN_MS);
 
-  window[RUNTIME_KEY] = Object.freeze({ version: '0.14.0', destroy });
+  window[RUNTIME_KEY] = Object.freeze({ version: '0.14.1', destroy });
   reconcile();
 })();

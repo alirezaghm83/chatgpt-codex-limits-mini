@@ -45,7 +45,7 @@ function loadCore() {
 }
 
 test('userscript metadata and anti-regression invariants', () => {
-  assert.match(source, /\/\/ @version\s+0\.14\.0/);
+  assert.match(source, /\/\/ @version\s+0\.14\.1/);
   assert.match(source, /@icon\s+data:image\/png;base64,/);
   assert.match(source, /window\[RUNTIME_KEY\]\?\.destroy\?\.\(\)/);
   assert.match(source, /document\.createElement\('button'\)/);
@@ -74,7 +74,7 @@ test('embedded icon exactly matches the checked-in 128x128 favicon', async () =>
 
 test('project icon and favicon variants have their intended PNG dimensions', async () => {
   const assets = [
-    ['project-icon.png', 1254],
+    ['project-icon.png', 512],
     ['favicon-128.png', 128],
     ['favicon-32.png', 32],
   ];
