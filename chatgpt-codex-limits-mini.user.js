@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Codex Limits Mini
 // @namespace    alirezadigi.chatgpt.codex-limits
-// @version      0.15.1
+// @version      0.16.0
 // @description  Shows the remaining 5-hour and weekly limits in the ChatGPT sidebar.
 // @license      MIT
 // @match        https://chatgpt.com/*
@@ -38,6 +38,8 @@
     HISTORY_RETENTION_DAYS: 14,
     HISTORY_MAX_ENTRIES: 500,
     HISTORY_MIN_SAMPLE_MINUTES: 5,
+    HISTORY_TREND_HOURS: 6,
+    HISTORY_PANEL_ENTRIES: 25,
   });
 
   const CONFIG = Object.freeze({
@@ -145,6 +147,9 @@
       #${HISTORY_PANEL_ID} { position:fixed; z-index:2147483647; box-sizing:border-box; width:min(340px, calc(100vw - 24px)); max-height:min(440px, calc(100vh - 24px)); overflow:auto; padding:13px; border:1px solid rgba(127,127,127,.3); border-radius:12px; background:var(--main-surface-primary, var(--sidebar-surface-primary, #fff)); color:var(--text-primary, #111); box-shadow:0 14px 42px rgba(0,0,0,.22); font:12px/1.35 ui-sans-serif, system-ui, sans-serif; }
       @media (prefers-color-scheme: dark) { #${HISTORY_PANEL_ID} { background:#202123; color:#ececf1; } }
       #${HISTORY_PANEL_ID} .clm-history-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; font-size:13px; font-weight:700; }
+      #${HISTORY_PANEL_ID} .clm-history-actions { display:flex; align-items:center; gap:3px; }
+      #${HISTORY_PANEL_ID} .clm-history-export { appearance:none; border:1px solid rgba(127,127,127,.35); border-radius:6px; background:transparent; color:inherit; cursor:pointer; font:inherit; font-size:11px; padding:3px 6px; }
+      #${HISTORY_PANEL_ID} .clm-history-export:disabled { cursor:default; opacity:.45; }
       #${HISTORY_PANEL_ID} .clm-history-close { appearance:none; border:0; border-radius:6px; background:transparent; color:inherit; cursor:pointer; font:inherit; font-size:16px; line-height:1; padding:2px 5px; }
       #${HISTORY_PANEL_ID} .clm-history-note { margin:0 0 10px; color:inherit; opacity:.65; }
       #${HISTORY_PANEL_ID} .clm-history-summary { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
@@ -516,14 +521,43 @@
   function historyTrend(history, key) {
     const points = history.filter(point => Number.isFinite(point[key]));
     if (points.length < 2) return 'Collecting history';
-    const first = points[0];
     const last = points.at(-1);
+    const cutoff = last.at - SETTINGS.HISTORY_TREND_HOURS * 60 * 60 * 1000;
+    const first = points.find(point => point.at >= cutoff) || points[0];
     const change = first[key] - last[key];
     const duration = last.at - first.at;
     if (Math.abs(change) < 0.05) return `No net change in ${formatHistoryDuration(duration)}`;
     const direction = change > 0 ? 'used' : 'recovered';
     const rate = Math.abs(change) / Math.max(1 / 60, duration / 3_600_000);
     return `${Math.abs(change).toFixed(1)}pp ${direction} in ${formatHistoryDuration(duration)} · ${rate.toFixed(1)}pp/h`;
+  }
+
+  function csvCell(value) {
+    return `"${String(value ?? '').replaceAll('"', '""')}"`;
+  }
+
+  function historyToCsv(history) {
+    const header = ['timestamp_iso', 'timestamp_local', 'five_remaining_percent', 'weekly_remaining_percent'];
+    const rows = history.map(point => [
+      new Date(point.at).toISOString(),
+      new Date(point.at).toLocaleString(),
+      point.five ?? '',
+      point.week ?? '',
+    ]);
+    return [header, ...rows].map(row => row.map(csvCell).join(',')).join('\n');
+  }
+
+  function exportUsageHistory(history) {
+    if (!history.length) return;
+    const blob = new Blob([historyToCsv(history)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `codex-limits-history-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   function closeHistory() {
@@ -557,22 +591,31 @@
     heading.className = 'clm-history-head';
     const title = document.createElement('span');
     title.textContent = 'Usage history';
+    const actions = document.createElement('div');
+    actions.className = 'clm-history-actions';
+    const exportButton = document.createElement('button');
+    exportButton.className = 'clm-history-export';
+    exportButton.type = 'button';
+    exportButton.textContent = 'Export CSV';
     const close = document.createElement('button');
     close.className = 'clm-history-close';
     close.type = 'button';
     close.textContent = '×';
     close.setAttribute('aria-label', 'Close history');
     close.addEventListener('click', closeHistory);
-    heading.append(title, close);
+    actions.append(exportButton, close);
+    heading.append(title, actions);
 
     const note = document.createElement('p');
     note.className = 'clm-history-note';
     note.textContent = SETTINGS.HISTORY_ENABLED
-      ? `Stored only in this browser · ${SETTINGS.HISTORY_RETENTION_DAYS}-day retention`
+      ? `Stored only in this browser · ${SETTINGS.HISTORY_RETENTION_DAYS}-day retention · max ${SETTINGS.HISTORY_MAX_ENTRIES} records`
       : 'History is disabled in SETTINGS';
 
     const now = Date.now();
     const history = readUsageHistory(now);
+    exportButton.disabled = history.length === 0;
+    exportButton.addEventListener('click', () => exportUsageHistory(history));
     const latest = history.at(-1) || {};
     const summaries = document.createElement('div');
     summaries.className = 'clm-history-summary';
@@ -583,7 +626,7 @@
 
     const list = document.createElement('ul');
     list.className = 'clm-history-list';
-    const recent = history.slice(-10).reverse();
+    const recent = history.slice(-SETTINGS.HISTORY_PANEL_ENTRIES).reverse();
     if (!recent.length) {
       const item = document.createElement('li');
       item.textContent = 'No samples yet. The first successful refresh will be recorded.';
@@ -600,6 +643,12 @@
         item.append(time, five, week);
         list.append(item);
       }
+    }
+
+    if (history.length > recent.length) {
+      const item = document.createElement('li');
+      item.textContent = `Showing newest ${recent.length} of ${history.length} saved records. Export CSV includes all records.`;
+      list.append(item);
     }
 
     panel.append(heading, note, summaries, list);
@@ -961,6 +1010,6 @@
   addInterval(() => fetchUsage(false), CONFIG.REFRESH_MS);
   addInterval(render, CONFIG.COUNTDOWN_MS);
 
-  window[RUNTIME_KEY] = Object.freeze({ version: '0.15.1', destroy });
+  window[RUNTIME_KEY] = Object.freeze({ version: '0.16.0', destroy });
   reconcile();
 })();

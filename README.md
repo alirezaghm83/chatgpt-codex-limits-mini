@@ -17,7 +17,7 @@ A lightweight Tampermonkey userscript that shows the remaining **5-hour** and **
 - Highlights the lowest limit only when it needs attention, keeping the other window calm
 - Uses detailed hover text for remaining/used percentage, exact reset time, and freshness
 - Stores a local-only usage history with retention and sample limits you can configure
-- Right-click the widget to open the local history panel with rate-of-use summaries and recent samples
+- Right-click the widget to open the local history panel with rate-of-use summaries, recent samples, and CSV export
 - Refreshes usage automatically every 2 minutes
 - Updates countdowns locally without extra API requests
 - Click the row to force-refresh usage
@@ -59,12 +59,14 @@ const SETTINGS = Object.freeze({
   HISTORY_RETENTION_DAYS: 14,
   HISTORY_MAX_ENTRIES: 500,
   HISTORY_MIN_SAMPLE_MINUTES: 5,
+  HISTORY_TREND_HOURS: 6,
+  HISTORY_PANEL_ENTRIES: 25,
 });
 ```
 
 In vertical mode, the order is always **5h** followed by **Weekly**.
 
-History remains in `localStorage` for the same browser profile; it is never sent to another service. Right-click the widget to inspect it without making the sidebar permanently taller.
+History remains in `localStorage` for the same browser profile; it is never sent to another service. Right-click the widget to inspect it without making the sidebar permanently taller. The panel shows the newest `HISTORY_PANEL_ENTRIES` samples, while **Export CSV** downloads every retained record.
 
 ### Manual install
 

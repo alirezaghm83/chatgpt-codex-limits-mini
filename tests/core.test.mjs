@@ -28,6 +28,8 @@ function loadCore() {
     'normalizeHistory',
     'formatHistoryDuration',
     'historyTrend',
+    'csvCell',
+    'historyToCsv',
     'allObjects',
     'firstFinite',
     'windowSeconds',
@@ -46,6 +48,7 @@ function loadCore() {
       TONE_CRITICAL_AT_OR_BELOW: 20,
       HISTORY_RETENTION_DAYS: 14,
       HISTORY_MAX_ENTRIES: 500,
+      HISTORY_TREND_HOURS: 6,
     };
     ${names.map(extractFunction).join('\n')}
     globalThis.core = { ${names.join(', ')} };
@@ -56,7 +59,7 @@ function loadCore() {
 }
 
 test('userscript metadata and anti-regression invariants', () => {
-  assert.match(source, /\/\/ @version\s+0\.15\.1/);
+  assert.match(source, /\/\/ @version\s+0\.16\.0/);
   assert.match(source, /@icon\s+data:image\/png;base64,/);
   assert.match(source, /window\[RUNTIME_KEY\]\?\.destroy\?\.\(\)/);
   assert.match(source, /document\.createElement\('button'\)/);
@@ -68,6 +71,7 @@ test('userscript metadata and anti-regression invariants', () => {
   assert.match(source, /VERTICAL_DENSITY: 'compact'/);
   assert.match(source, /DISPLAY_MODE: 'full'/);
   assert.match(source, /HISTORY_ENABLED: true/);
+  assert.match(source, /HISTORY_PANEL_ENTRIES: 25/);
   assert.match(source, /row\.dataset\.clmLayout = SETTINGS\.LAYOUT === 'horizontal'/);
   assert.match(source, /row\.dataset\.clmDensity = SETTINGS\.VERTICAL_DENSITY === 'comfortable'/);
   assert.match(source, /row\.dataset\.clmDisplay = SETTINGS\.DISPLAY_MODE === 'minimal'/);
@@ -79,6 +83,8 @@ test('userscript metadata and anti-regression invariants', () => {
   assert.match(source, /addEventListener\('contextmenu'/);
   assert.match(source, /localStorage\.setItem\(HISTORY_STORAGE_KEY/);
   assert.match(source, /recordUsageHistory\(parsed, state\.lastSuccessAt\)/);
+  assert.match(source, /exportUsageHistory\(history\)/);
+  assert.match(source, /Export CSV/);
 });
 
 test('embedded icon exactly matches the checked-in 128x128 favicon', async () => {
@@ -135,8 +141,8 @@ test('age formatting and lowest-limit selection prioritize current information',
   assert.equal(lowestUsageWindow({ five: { remaining: Number.NaN }, week: null }), null);
 });
 
-test('local history is bounded, recent, and produces a consumption trend', () => {
-  const { normalizeHistory, historyTrend } = loadCore();
+test('local history is bounded, recent, and exports every record as CSV', () => {
+  const { normalizeHistory, historyTrend, csvCell, historyToCsv } = loadCore();
   const now = 2_000_000_000_000;
   const history = normalizeHistory([
     { at: now - (15 * 24 * 60 * 60 * 1000), five: 90, week: 90 },
@@ -146,6 +152,12 @@ test('local history is bounded, recent, and produces a consumption trend', () =>
   assert.equal(history.length, 2);
   assert.equal(history[0].five, 80);
   assert.match(historyTrend(history, 'five'), /10\.0pp used in 1h/);
+  const csv = historyToCsv(history);
+  assert.equal(csv.split('\n').length, 3);
+  assert.match(csv, /"timestamp_iso","timestamp_local","five_remaining_percent","weekly_remaining_percent"/);
+  assert.match(csv, /"2033-05-18T01:33:20\.000Z","[^"]+","80","60"/);
+  assert.match(csv, /"2033-05-18T03:03:20\.000Z","[^"]+","70","58"/);
+  assert.equal(csvCell('a"b'), '"a""b"');
 });
 
 test('countdowns use minute, hour, and day precision', () => {
