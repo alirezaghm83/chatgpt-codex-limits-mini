@@ -17,7 +17,10 @@ A lightweight Tampermonkey userscript that shows the remaining **5-hour** and **
 - Integrates visually with **ChatGPT Exporter** when installed
 - Falls back to a standalone native-looking sidebar row when Exporter is absent
 - Avoids triggering Exporter's Radix HoverCard when hovering the limits row
-- Uses idempotent rendering and ignores its own DOM mutations
+- Keeps one stable sidebar row and moves it instead of destroying/recreating it
+- Filters DOM mutations so normal ChatGPT message streaming does not trigger reconciliation
+- Cleans up timers, observers, and in-flight requests if the userscript is reloaded
+- Caches the session token until shortly before expiry and retries once after an authentication failure
 
 ## Installation
 
@@ -46,7 +49,19 @@ The script reads the current ChatGPT session when available and requests:
 
 It identifies the 5-hour and 7-day rate-limit windows by their `limit_window_seconds` values, converts `used_percent` to the remaining percentage, and reads the reset timestamp to maintain a local countdown.
 
-For sidebar placement, the script prefers ChatGPT Exporter's `.ce-nav-trigger` when present so the row inherits the same outer layout. Otherwise it inserts a native-looking row immediately above ChatGPT's profile section. The row's inner content is rebuilt from scratch so profile names and unrelated account text are never copied into it.
+For sidebar placement, the script prefers ChatGPT Exporter's `.ce-nav-trigger` when present so the row inherits the same outer layout. Otherwise it inserts a native-looking row immediately above ChatGPT's profile section. It copies only safe presentation classes into a newly created button—never the profile/Exporter DOM or attributes—so profile names, test IDs, Radix state, and unrelated event behavior cannot leak into the limits row.
+
+The UI is persistent: percentage and countdown text nodes are updated in place. If ChatGPT replaces the sidebar anchor, the same row is moved to the new location instead of being removed and recreated.
+
+## Development
+
+The project has no runtime or test dependencies. With Node.js installed:
+
+```bash
+npm run check
+```
+
+This performs a JavaScript syntax check and runs the Node test suite for metadata invariants, percentage formatting, countdown formatting, nested WHAM response parsing, and null-number handling.
 
 ## Compatibility notes
 

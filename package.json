@@ -1,0 +1,10 @@
+{
+  "name": "chatgpt-codex-limits-mini",
+  "version": "0.12.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check chatgpt-codex-limits-mini.user.js && npm test"
+  }
+}
