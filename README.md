@@ -12,7 +12,12 @@ A lightweight Tampermonkey userscript that shows the remaining **5-hour** and **
 - Uses the full Exporter-style sidebar width with larger, higher-contrast typography
 - Shows a remaining-capacity progress bar for each window, with green/amber/red states
 - Supports configurable vertical or horizontal limit layout; vertical keeps Weekly below 5h
+- Supports a minimal mode that shows only the lowest remaining limit and its progress bar
 - Shows a muted live reset countdown under each limit (`↻ 2h 14m`, `↻ 3d 8h`)
+- Highlights the lowest limit only when it needs attention, keeping the other window calm
+- Uses detailed hover text for remaining/used percentage, exact reset time, and freshness
+- Stores a local-only usage history with retention and sample limits you can configure
+- Right-click the widget to open the local history panel with rate-of-use summaries and recent samples
 - Refreshes usage automatically every 2 minutes
 - Updates countdowns locally without extra API requests
 - Click the row to force-refresh usage
@@ -37,21 +42,29 @@ Open the link above with Tampermonkey installed. Tampermonkey should recognize t
 
 The script declares the GitHub Raw URL as both `@downloadURL` and `@updateURL`, so compatible userscript managers can detect future version bumps pushed to `main`.
 
-### Layout
+### Settings
 
-The default layout is vertical for clearer separation between the two progress bars. To place the limits side by side, change this setting near the top of the userscript:
+The configuration block near the top of the userscript controls layout, density, minimal mode, refresh frequency, colors, and history:
 
 ```js
-const LIMITS_LAYOUT = 'horizontal'; // 'vertical' or 'horizontal'
+const SETTINGS = Object.freeze({
+  LAYOUT: 'vertical', // 'vertical' or 'horizontal'
+  VERTICAL_DENSITY: 'compact', // 'compact' or 'comfortable'
+  DISPLAY_MODE: 'full', // 'full' or 'minimal'
+  HIGHLIGHT_LOWEST: true,
+  TONE_LOW_AT_OR_BELOW: 50,
+  TONE_CRITICAL_AT_OR_BELOW: 20,
+  REFRESH_MINUTES: 2,
+  HISTORY_ENABLED: true,
+  HISTORY_RETENTION_DAYS: 14,
+  HISTORY_MAX_ENTRIES: 500,
+  HISTORY_MIN_SAMPLE_MINUTES: 5,
+});
 ```
 
 In vertical mode, the order is always **5h** followed by **Weekly**.
 
-The vertical layout is compact by default, while retaining the same readable labels and percentages. To restore more breathing room, change:
-
-```js
-const VERTICAL_DENSITY = 'comfortable'; // 'compact' or 'comfortable'
-```
+History remains in `localStorage` for the same browser profile; it is never sent to another service. Right-click the widget to inspect it without making the sidebar permanently taller.
 
 ### Manual install
 

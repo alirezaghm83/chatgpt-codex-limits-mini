@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Codex Limits Mini
 // @namespace    alirezadigi.chatgpt.codex-limits
-// @version      0.14.2
+// @version      0.15.0
 // @description  Shows the remaining 5-hour and weekly limits in the ChatGPT sidebar.
 // @license      MIT
 // @match        https://chatgpt.com/*
@@ -19,18 +19,30 @@
   const RUNTIME_KEY = '__chatgptCodexLimitsMiniRuntime';
   const ROW_ID = 'codex-limits-native-row';
   const STYLE_ID = 'codex-limits-native-style';
+  const HISTORY_PANEL_ID = 'codex-limits-history-panel';
+  const HISTORY_STORAGE_KEY = 'codex-limits-mini.history.v1';
   const PROFILE_SELECTOR = '[data-testid="accounts-profile-button"]';
   const EXPORTER_SELECTOR = '.ce-nav-trigger';
   const MOUNT_SELECTOR = `${PROFILE_SELECTOR}, ${EXPORTER_SELECTOR}`;
 
-  // Change to 'horizontal' to show 5h and Weekly side by side.
-  const LIMITS_LAYOUT = 'vertical';
-  // Applies only to the vertical layout; keeps the labels and percentages readable.
-  const VERTICAL_DENSITY = 'compact'; // 'compact' or 'comfortable'
+  // Personalize the widget here. No data is sent anywhere except ChatGPT's usage endpoint.
+  const SETTINGS = Object.freeze({
+    LAYOUT: 'vertical', // 'vertical' or 'horizontal'
+    VERTICAL_DENSITY: 'compact', // 'compact' or 'comfortable'
+    DISPLAY_MODE: 'full', // 'full' or 'minimal' (only the lowest remaining limit)
+    HIGHLIGHT_LOWEST: true,
+    TONE_LOW_AT_OR_BELOW: 50,
+    TONE_CRITICAL_AT_OR_BELOW: 20,
+    REFRESH_MINUTES: 2,
+    HISTORY_ENABLED: true,
+    HISTORY_RETENTION_DAYS: 14,
+    HISTORY_MAX_ENTRIES: 500,
+    HISTORY_MIN_SAMPLE_MINUTES: 5,
+  });
 
   const CONFIG = Object.freeze({
     USAGE_PATH: '/backend-api/wham/usage',
-    REFRESH_MS: 2 * 60 * 1000,
+    REFRESH_MS: SETTINGS.REFRESH_MINUTES * 60 * 1000,
     HEALTH_CHECK_MS: 15 * 1000,
     COUNTDOWN_MS: 30 * 1000,
     FETCH_TIMEOUT_MS: 15 * 1000,
@@ -58,6 +70,8 @@
     abortController: null,
     reconcileTimer: null,
     resizeFrame: null,
+    historyPanel: null,
+    historyCleanup: null,
     intervals: new Set(),
   };
 
@@ -105,6 +119,8 @@
       #${ROW_ID}[data-clm-layout="vertical"][data-clm-density="compact"] .clm-progress { height:3px; margin-top:4px; }
       #${ROW_ID}[data-clm-layout="vertical"][data-clm-density="compact"] .clm-reset { margin-top:3px; }
       #${ROW_ID} .clm-limit { display:flex; flex-direction:column; align-items:stretch; min-width:0; line-height:1.15; white-space:nowrap; --clm-accent:#10a37f; }
+      #${ROW_ID} .clm-limit[data-clm-priority="true"] .clm-label { opacity:1; font-weight:650; }
+      #${ROW_ID} .clm-limit[data-clm-muted="true"] { opacity:.72; }
       #${ROW_ID} .clm-limit[data-tone="low"] { --clm-accent:#d97706; }
       #${ROW_ID} .clm-limit[data-tone="critical"] { --clm-accent:#dc2626; }
       #${ROW_ID} .clm-main { display:flex; align-items:baseline; justify-content:space-between; gap:6px; min-width:0; font-size:13px; }
@@ -113,6 +129,10 @@
       #${ROW_ID} .clm-progress { display:block; position:relative; overflow:hidden; width:100%; height:4px; margin-top:6px; border-radius:999px; background:rgba(127,127,127,.2); }
       #${ROW_ID} .clm-progress-fill { display:block; width:0; height:100%; border-radius:inherit; background:var(--clm-accent); transition:width 280ms ease, background-color 180ms ease; }
       #${ROW_ID} .clm-reset { margin-top:5px; overflow:hidden; text-overflow:ellipsis; font-size:10.5px; line-height:1.15; opacity:.58; font-weight:400; }
+      #${ROW_ID} .clm-minimal { width:100%; }
+      #${ROW_ID} .clm-minimal .clm-reset { display:none; }
+      #${ROW_ID}[data-clm-display="minimal"] .clm-content { align-items:center; }
+      #${ROW_ID}[data-clm-display="minimal"] .clm-icon { margin-top:0; }
       #${ROW_ID} .clm-status { display:flex; align-items:center; min-height:28px; font-size:12px; opacity:.68; }
       #${ROW_ID}.clm-collapsed .clm-values,
       #${ROW_ID}.clm-collapsed .clm-status { display:none !important; }
@@ -122,6 +142,16 @@
       #${ROW_ID}.clm-collapsed .clm-icon svg { width:18px; height:18px; }
       #${ROW_ID} [hidden] { display:none !important; }
       #${ROW_ID} .clm-spinner { display:inline-block; width:10px; height:10px; border:1.5px solid currentColor; border-right-color:transparent; border-radius:50%; animation:clm-spin .7s linear infinite; opacity:.65; }
+      #${HISTORY_PANEL_ID} { position:fixed; z-index:2147483647; box-sizing:border-box; width:min(340px, calc(100vw - 24px)); max-height:min(440px, calc(100vh - 24px)); overflow:auto; padding:13px; border:1px solid rgba(127,127,127,.3); border-radius:12px; background:var(--main-surface-primary, var(--sidebar-surface-primary, #fff)); color:var(--text-primary, #111); box-shadow:0 14px 42px rgba(0,0,0,.22); font:12px/1.35 ui-sans-serif, system-ui, sans-serif; }
+      @media (prefers-color-scheme: dark) { #${HISTORY_PANEL_ID} { background:#202123; color:#ececf1; } }
+      #${HISTORY_PANEL_ID} .clm-history-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; font-size:13px; font-weight:700; }
+      #${HISTORY_PANEL_ID} .clm-history-close { appearance:none; border:0; border-radius:6px; background:transparent; color:inherit; cursor:pointer; font:inherit; font-size:16px; line-height:1; padding:2px 5px; }
+      #${HISTORY_PANEL_ID} .clm-history-note { margin:0 0 10px; color:inherit; opacity:.65; }
+      #${HISTORY_PANEL_ID} .clm-history-summary { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+      #${HISTORY_PANEL_ID} .clm-history-card { padding:8px; border-radius:8px; background:rgba(127,127,127,.11); }
+      #${HISTORY_PANEL_ID} .clm-history-card strong { display:block; margin-top:2px; font-size:14px; }
+      #${HISTORY_PANEL_ID} .clm-history-list { display:grid; gap:4px; margin:0; padding:0; list-style:none; font-variant-numeric:tabular-nums; }
+      #${HISTORY_PANEL_ID} .clm-history-list li { display:grid; grid-template-columns:48px 1fr 1fr; gap:6px; padding:5px 0; border-top:1px solid rgba(127,127,127,.16); }
       @keyframes clm-spin { to { transform:rotate(360deg); } }
     `;
     document.head.appendChild(style);
@@ -234,7 +264,7 @@
 
     main.append(labelNode, remaining);
     root.append(main, progress, reset);
-    return { root, remaining, reset, progress, progressFill };
+    return { root, label: labelNode, remaining, reset, progress, progressFill };
   }
 
   function applySourceAppearance(row, source, mode) {
@@ -242,8 +272,9 @@
     row.classList.add('clm-row');
     row.classList.remove('ce-nav-trigger-collapsed', 'clm-collapsed');
     row.dataset.clmMode = mode;
-    row.dataset.clmLayout = LIMITS_LAYOUT === 'horizontal' ? 'horizontal' : 'vertical';
-    row.dataset.clmDensity = VERTICAL_DENSITY === 'comfortable' ? 'comfortable' : 'compact';
+    row.dataset.clmLayout = SETTINGS.LAYOUT === 'horizontal' ? 'horizontal' : 'vertical';
+    row.dataset.clmDensity = SETTINGS.VERTICAL_DENSITY === 'comfortable' ? 'comfortable' : 'compact';
+    row.dataset.clmDisplay = SETTINGS.DISPLAY_MODE === 'minimal' ? 'minimal' : 'full';
   }
 
   function createUi(target) {
@@ -264,16 +295,23 @@
     const five = createLimit('5h');
     const week = createLimit('Weekly');
     values.append(five.root, week.root);
+    const minimal = createLimit('Lowest remaining');
+    minimal.root.classList.add('clm-minimal');
+    minimal.root.hidden = true;
     const status = document.createElement('span');
     status.className = 'clm-status';
     status.hidden = true;
-    content.append(icon, values, status);
+    content.append(icon, values, minimal.root, status);
     row.append(content);
 
     row.addEventListener('click', () => fetchUsage(true));
+    row.addEventListener('contextmenu', event => {
+      event.preventDefault();
+      showHistory(event);
+    });
     row.addEventListener('mouseenter', event => event.stopPropagation(), true);
     row.addEventListener('pointerenter', event => event.stopPropagation(), true);
-    return { row, values, status, five, week };
+    return { row, values, minimal, status, five, week };
   }
 
   function setText(node, value) {
@@ -304,16 +342,36 @@
     return `↻ ${Math.max(1, minutes)}m`;
   }
 
-  function resetTitle(resetAt) {
-    return Number.isFinite(resetAt)
-      ? `Resets ${new Date(resetAt).toLocaleString()}`
-      : 'Reset time unavailable';
+  function formatAge(timestamp, now = Date.now()) {
+    if (!Number.isFinite(timestamp)) return 'unknown time';
+    const seconds = Math.max(0, Math.floor((now - timestamp) / 1000));
+    if (seconds < 45) return 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+  }
+
+  function lowestUsageWindow(usage) {
+    const candidates = [
+      { key: 'five', label: '5h', window: usage?.five },
+      { key: 'week', label: 'Weekly', window: usage?.week },
+    ].filter(candidate => Number.isFinite(candidate.window?.remaining));
+    return candidates.sort((a, b) => a.window.remaining - b.window.remaining)[0] || null;
+  }
+
+  function limitTitle(label, usageWindow) {
+    const remaining = usageWindow?.remaining;
+    const used = Number.isFinite(remaining) ? 100 - remaining : null;
+    const reset = Number.isFinite(usageWindow?.resetAt)
+      ? new Date(usageWindow.resetAt).toLocaleString()
+      : 'unavailable';
+    return `${label}\nRemaining: ${formatRemaining(remaining)}\nUsed: ${used == null ? '—' : formatRemaining(used)}\nResets: ${reset}`;
   }
 
   function progressTone(value) {
     if (!Number.isFinite(value)) return 'unknown';
-    if (value <= 20) return 'critical';
-    if (value <= 50) return 'low';
+    if (value <= SETTINGS.TONE_CRITICAL_AT_OR_BELOW) return 'critical';
+    if (value <= SETTINGS.TONE_LOW_AT_OR_BELOW) return 'low';
     return 'healthy';
   }
 
@@ -334,8 +392,15 @@
     } else {
       uiLimit.progress.removeAttribute('aria-valuenow');
     }
-    const title = resetTitle(usageWindow?.resetAt);
+    const label = uiLimit.label.textContent || 'Usage limit';
+    uiLimit.progress.setAttribute('aria-label', `${label} ${formatRemaining(remaining)} remaining`);
+    const title = limitTitle(label, usageWindow);
     if (uiLimit.root.title !== title) uiLimit.root.title = title;
+  }
+
+  function setLimitEmphasis(uiLimit, priority, muted) {
+    uiLimit.root.dataset.clmPriority = priority ? 'true' : 'false';
+    uiLimit.root.dataset.clmMuted = muted ? 'true' : 'false';
   }
 
   function render() {
@@ -344,6 +409,7 @@
 
     if (!state.usage) {
       setHidden(ui.values, true);
+      setHidden(ui.minimal.root, true);
       setHidden(ui.status, false);
       if (state.isFetching) {
         if (!ui.status.querySelector('.clm-spinner')) {
@@ -358,19 +424,204 @@
     }
 
     setHidden(ui.status, true);
-    setHidden(ui.values, false);
     const now = Date.now();
-    renderLimit(ui.five, state.usage.five, now);
-    renderLimit(ui.week, state.usage.week, now);
+    const minimalMode = ui.row.dataset.clmDisplay === 'minimal';
+    setHidden(ui.values, minimalMode);
+    setHidden(ui.minimal.root, !minimalMode);
 
+    const lowest = lowestUsageWindow(state.usage);
+    if (minimalMode) {
+      ui.minimal.label.textContent = lowest ? `Lowest · ${lowest.label}` : 'Lowest remaining';
+      renderLimit(ui.minimal, lowest?.window, now);
+    } else {
+      renderLimit(ui.five, state.usage.five, now);
+      renderLimit(ui.week, state.usage.week, now);
+      const emphasize = SETTINGS.HIGHLIGHT_LOWEST && lowest &&
+        lowest.window.remaining <= SETTINGS.TONE_LOW_AT_OR_BELOW;
+      setLimitEmphasis(ui.five, emphasize && lowest.key === 'five', emphasize && lowest.key !== 'five');
+      setLimitEmphasis(ui.week, emphasize && lowest.key === 'week', emphasize && lowest.key !== 'week');
+    }
+
+    ui.row.dataset.clmStale = state.error ? 'true' : 'false';
+    const updatedAge = formatAge(state.lastSuccessAt, now);
     ui.row.title = state.error
-      ? 'Last refresh failed; showing the last known values. Click to retry.'
-      : `Last updated ${new Date(state.lastSuccessAt).toLocaleTimeString()}; click to refresh.`;
+      ? `Last refresh failed; showing last known values from ${updatedAge}. Click to retry. Right-click for local history.`
+      : `Updated ${updatedAge}. Click to refresh. Right-click for local history.`;
 
     const fiveText = formatRemaining(state.usage.five?.remaining);
     const weekText = formatRemaining(state.usage.week?.remaining);
-    const ariaLabel = `5-hour ${fiveText} remaining; weekly ${weekText} remaining; click to refresh`;
+    const ariaLabel = `5-hour ${fiveText} remaining; weekly ${weekText} remaining; updated ${updatedAge}; click to refresh; right-click for local history`;
     if (ui.row.getAttribute('aria-label') !== ariaLabel) ui.row.setAttribute('aria-label', ariaLabel);
+  }
+
+  function normalizeHistory(entries, now = Date.now()) {
+    const minimumTime = now - SETTINGS.HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    if (!Array.isArray(entries)) return [];
+    return entries
+      .filter(entry => entry && Number.isFinite(entry.at) && entry.at >= minimumTime && entry.at <= now)
+      .map(entry => ({
+        at: entry.at,
+        five: Number.isFinite(entry.five) ? Math.max(0, Math.min(100, entry.five)) : null,
+        week: Number.isFinite(entry.week) ? Math.max(0, Math.min(100, entry.week)) : null,
+      }))
+      .filter(entry => entry.five != null || entry.week != null)
+      .sort((a, b) => a.at - b.at)
+      .slice(-SETTINGS.HISTORY_MAX_ENTRIES);
+  }
+
+  function readUsageHistory(now = Date.now()) {
+    if (!SETTINGS.HISTORY_ENABLED) return [];
+    try {
+      return normalizeHistory(JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || '[]'), now);
+    } catch {
+      return [];
+    }
+  }
+
+  function writeUsageHistory(history) {
+    if (!SETTINGS.HISTORY_ENABLED) return;
+    try {
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+    } catch (error) {
+      console.debug('[Usage Limits Mini] Could not save local history', error);
+    }
+  }
+
+  function recordUsageHistory(usage, now = Date.now()) {
+    if (!SETTINGS.HISTORY_ENABLED) return;
+    const snapshot = {
+      at: now,
+      five: Number.isFinite(usage?.five?.remaining) ? usage.five.remaining : null,
+      week: Number.isFinite(usage?.week?.remaining) ? usage.week.remaining : null,
+    };
+    if (snapshot.five == null && snapshot.week == null) return;
+
+    const history = readUsageHistory(now);
+    const last = history.at(-1);
+    const changed = !last || last.five !== snapshot.five || last.week !== snapshot.week;
+    const minimumInterval = SETTINGS.HISTORY_MIN_SAMPLE_MINUTES * 60 * 1000;
+    if (!changed && now - last.at < minimumInterval) return;
+
+    history.push(snapshot);
+    writeUsageHistory(normalizeHistory(history, now));
+  }
+
+  function formatHistoryDuration(milliseconds) {
+    const minutes = Math.max(1, Math.round(milliseconds / 60_000));
+    if (minutes < 60) return `${minutes}m`;
+    if (minutes < 1440) return `${Math.floor(minutes / 60)}h`;
+    return `${Math.floor(minutes / 1440)}d`;
+  }
+
+  function historyTrend(history, key) {
+    const points = history.filter(point => Number.isFinite(point[key]));
+    if (points.length < 2) return 'Collecting history';
+    const first = points[0];
+    const last = points.at(-1);
+    const change = first[key] - last[key];
+    const duration = last.at - first.at;
+    if (Math.abs(change) < 0.05) return `No net change in ${formatHistoryDuration(duration)}`;
+    const direction = change > 0 ? 'used' : 'recovered';
+    const rate = Math.abs(change) / Math.max(1 / 60, duration / 3_600_000);
+    return `${Math.abs(change).toFixed(1)}pp ${direction} in ${formatHistoryDuration(duration)} · ${rate.toFixed(1)}pp/h`;
+  }
+
+  function closeHistory() {
+    state.historyCleanup?.();
+    state.historyCleanup = null;
+    state.historyPanel?.remove();
+    state.historyPanel = null;
+  }
+
+  function historyCard(label, latest, trend) {
+    const card = document.createElement('div');
+    card.className = 'clm-history-card';
+    const heading = document.createElement('span');
+    heading.textContent = label;
+    const value = document.createElement('strong');
+    value.textContent = formatRemaining(latest);
+    const detail = document.createElement('span');
+    detail.textContent = trend;
+    card.append(heading, value, detail);
+    return card;
+  }
+
+  function showHistory(event) {
+    closeHistory();
+    const panel = document.createElement('section');
+    panel.id = HISTORY_PANEL_ID;
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-label', 'Local usage history');
+
+    const heading = document.createElement('div');
+    heading.className = 'clm-history-head';
+    const title = document.createElement('span');
+    title.textContent = 'Usage history';
+    const close = document.createElement('button');
+    close.className = 'clm-history-close';
+    close.type = 'button';
+    close.textContent = '×';
+    close.setAttribute('aria-label', 'Close history');
+    close.addEventListener('click', closeHistory);
+    heading.append(title, close);
+
+    const note = document.createElement('p');
+    note.className = 'clm-history-note';
+    note.textContent = SETTINGS.HISTORY_ENABLED
+      ? `Stored only in this browser · ${SETTINGS.HISTORY_RETENTION_DAYS}-day retention`
+      : 'History is disabled in SETTINGS';
+
+    const now = Date.now();
+    const history = readUsageHistory(now);
+    const latest = history.at(-1) || {};
+    const summaries = document.createElement('div');
+    summaries.className = 'clm-history-summary';
+    summaries.append(
+      historyCard('5h remaining', latest.five, historyTrend(history, 'five')),
+      historyCard('Weekly remaining', latest.week, historyTrend(history, 'week')),
+    );
+
+    const list = document.createElement('ul');
+    list.className = 'clm-history-list';
+    const recent = history.slice(-10).reverse();
+    if (!recent.length) {
+      const item = document.createElement('li');
+      item.textContent = 'No samples yet. The first successful refresh will be recorded.';
+      list.append(item);
+    } else {
+      for (const point of recent) {
+        const item = document.createElement('li');
+        const time = document.createElement('span');
+        time.textContent = new Date(point.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const five = document.createElement('span');
+        five.textContent = `5h ${formatRemaining(point.five)}`;
+        const week = document.createElement('span');
+        week.textContent = `Week ${formatRemaining(point.week)}`;
+        item.append(time, five, week);
+        list.append(item);
+      }
+    }
+
+    panel.append(heading, note, summaries, list);
+    document.body.append(panel);
+    const left = Math.max(12, Math.min(event.clientX - panel.offsetWidth + 18, window.innerWidth - panel.offsetWidth - 12));
+    const top = Math.max(12, Math.min(event.clientY + 8, window.innerHeight - panel.offsetHeight - 12));
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+    state.historyPanel = panel;
+
+    const onPointerDown = pointerEvent => {
+      if (!panel.contains(pointerEvent.target)) closeHistory();
+    };
+    const onKeyDown = keyEvent => {
+      if (keyEvent.key === 'Escape') closeHistory();
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('keydown', onKeyDown);
+    state.historyCleanup = () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }
 
   function scheduleCollapsedSync() {
@@ -623,6 +874,7 @@
       if (!parsed.five && !parsed.week) throw new Error('rate-limit windows not found');
       state.usage = parsed;
       state.lastSuccessAt = Date.now();
+      recordUsageHistory(parsed, state.lastSuccessAt);
     } catch (error) {
       state.error = error;
       if (error.name !== 'AbortError') console.warn('[Usage Limits Mini]', error);
@@ -686,6 +938,7 @@
     for (const id of state.intervals) clearInterval(id);
     window.removeEventListener('resize', scheduleCollapsedSync);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
+    closeHistory();
     state.ui?.row.remove();
     document.getElementById(STYLE_ID)?.remove();
     if (window[RUNTIME_KEY]?.destroy === destroy) delete window[RUNTIME_KEY];
@@ -708,6 +961,6 @@
   addInterval(() => fetchUsage(false), CONFIG.REFRESH_MS);
   addInterval(render, CONFIG.COUNTDOWN_MS);
 
-  window[RUNTIME_KEY] = Object.freeze({ version: '0.14.2', destroy });
+  window[RUNTIME_KEY] = Object.freeze({ version: '0.15.0', destroy });
   reconcile();
 })();

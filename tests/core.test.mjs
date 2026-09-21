@@ -22,7 +22,12 @@ function loadCore() {
   const names = [
     'formatRemaining',
     'formatCountdown',
+    'formatAge',
+    'lowestUsageWindow',
     'progressTone',
+    'normalizeHistory',
+    'formatHistoryDuration',
+    'historyTrend',
     'allObjects',
     'firstFinite',
     'windowSeconds',
@@ -36,6 +41,12 @@ function loadCore() {
       FIVE_HOURS_SECONDS: 18000,
       WEEK_SECONDS: 604800,
     };
+    const SETTINGS = {
+      TONE_LOW_AT_OR_BELOW: 50,
+      TONE_CRITICAL_AT_OR_BELOW: 20,
+      HISTORY_RETENTION_DAYS: 14,
+      HISTORY_MAX_ENTRIES: 500,
+    };
     ${names.map(extractFunction).join('\n')}
     globalThis.core = { ${names.join(', ')} };
   `;
@@ -45,21 +56,28 @@ function loadCore() {
 }
 
 test('userscript metadata and anti-regression invariants', () => {
-  assert.match(source, /\/\/ @version\s+0\.14\.2/);
+  assert.match(source, /\/\/ @version\s+0\.15\.0/);
   assert.match(source, /@icon\s+data:image\/png;base64,/);
   assert.match(source, /window\[RUNTIME_KEY\]\?\.destroy\?\.\(\)/);
   assert.match(source, /document\.createElement\('button'\)/);
   assert.doesNotMatch(source, /cloneNode\s*\(/);
   assert.doesNotMatch(source, /innerHTML\s*=\s*html/);
   assert.match(source, /className = 'clm-progress'/);
-  assert.match(source, /const LIMITS_LAYOUT = 'vertical'/);
-  assert.match(source, /const VERTICAL_DENSITY = 'compact'/);
-  assert.match(source, /row\.dataset\.clmLayout = LIMITS_LAYOUT === 'horizontal'/);
-  assert.match(source, /row\.dataset\.clmDensity = VERTICAL_DENSITY === 'comfortable'/);
+  assert.match(source, /const SETTINGS = Object\.freeze/);
+  assert.match(source, /LAYOUT: 'vertical'/);
+  assert.match(source, /VERTICAL_DENSITY: 'compact'/);
+  assert.match(source, /DISPLAY_MODE: 'full'/);
+  assert.match(source, /HISTORY_ENABLED: true/);
+  assert.match(source, /row\.dataset\.clmLayout = SETTINGS\.LAYOUT === 'horizontal'/);
+  assert.match(source, /row\.dataset\.clmDensity = SETTINGS\.VERTICAL_DENSITY === 'comfortable'/);
+  assert.match(source, /row\.dataset\.clmDisplay = SETTINGS\.DISPLAY_MODE === 'minimal'/);
   assert.match(source, /values\.append\(five\.root, week\.root\)/);
   assert.match(source, /data-clm-layout="vertical"/);
   assert.match(source, /data-clm-layout="horizontal"/);
   assert.match(source, /data-clm-density="compact"/);
+  assert.match(source, /addEventListener\('contextmenu'/);
+  assert.match(source, /localStorage\.setItem\(HISTORY_STORAGE_KEY/);
+  assert.match(source, /recordUsageHistory\(parsed, state\.lastSuccessAt\)/);
 });
 
 test('embedded icon exactly matches the checked-in 128x128 favicon', async () => {
@@ -104,6 +122,29 @@ test('progress tone reflects remaining capacity', () => {
   assert.equal(progressTone(50), 'low');
   assert.equal(progressTone(20), 'critical');
   assert.equal(progressTone(Number.NaN), 'unknown');
+});
+
+test('age formatting and lowest-limit selection prioritize current information', () => {
+  const { formatAge, lowestUsageWindow } = loadCore();
+  const now = 2_000_000_000_000;
+  assert.equal(formatAge(now - 30_000, now), 'just now');
+  assert.equal(formatAge(now - (8 * 60 * 1000), now), '8m ago');
+  assert.equal(formatAge(now - (3 * 60 * 60 * 1000), now), '3h ago');
+  assert.equal(lowestUsageWindow({ five: { remaining: 72 }, week: { remaining: 34 } }).key, 'week');
+  assert.equal(lowestUsageWindow({ five: { remaining: Number.NaN }, week: null }), null);
+});
+
+test('local history is bounded, recent, and produces a consumption trend', () => {
+  const { normalizeHistory, historyTrend } = loadCore();
+  const now = 2_000_000_000_000;
+  const history = normalizeHistory([
+    { at: now - (15 * 24 * 60 * 60 * 1000), five: 90, week: 90 },
+    { at: now - (2 * 60 * 60 * 1000), five: 80, week: 60 },
+    { at: now - (30 * 60 * 1000), five: 70, week: 58 },
+  ], now);
+  assert.equal(history.length, 2);
+  assert.equal(history[0].five, 80);
+  assert.match(historyTrend(history, 'five'), /10\.0pp used in 1h/);
 });
 
 test('countdowns use minute, hour, and day precision', () => {
