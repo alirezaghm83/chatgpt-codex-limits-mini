@@ -44,12 +44,22 @@ function loadCore() {
 }
 
 test('userscript metadata and anti-regression invariants', () => {
-  assert.match(source, /\/\/ @version\s+0\.12\.0/);
-  assert.match(source, /@icon\s+https:\/\/raw\.githubusercontent\.com\/alirezaghm83\/chatgpt-codex-limits-mini\/main\/assets\/icon-128\.png/);
+  assert.match(source, /\/\/ @version\s+0\.12\.1/);
+  assert.match(source, /@icon\s+data:image\/png;base64,/);
   assert.match(source, /window\[RUNTIME_KEY\]\?\.destroy\?\.\(\)/);
   assert.match(source, /document\.createElement\('button'\)/);
   assert.doesNotMatch(source, /cloneNode\s*\(/);
   assert.doesNotMatch(source, /innerHTML\s*=\s*html/);
+});
+
+test('embedded icon is a complete 128x128 PNG', () => {
+  const encoded = source.match(/\/\/ @icon\s+data:image\/png;base64,([^\r\n]+)/)?.[1];
+  assert.ok(encoded, 'embedded icon data must exist');
+  const image = Buffer.from(encoded, 'base64');
+  assert.deepEqual([...image.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.equal(image.readUInt32BE(16), 128);
+  assert.equal(image.readUInt32BE(20), 128);
+  assert.equal(image.length, 15_008);
 });
 
 test('remaining percentages are rounded without losing integers', () => {

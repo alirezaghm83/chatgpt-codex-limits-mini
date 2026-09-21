@@ -21,6 +21,7 @@ A lightweight Tampermonkey userscript that shows the remaining **5-hour** and **
 - Filters DOM mutations so normal ChatGPT message streaming does not trigger reconciliation
 - Cleans up timers, observers, and in-flight requests if the userscript is reloaded
 - Caches the session token until shortly before expiry and retries once after an authentication failure
+- Embeds the 128×128 PNG icon directly in userscript metadata, avoiding external icon-fetch and cache failures
 
 ## Installation
 
