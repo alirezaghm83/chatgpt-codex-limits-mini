@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Codex Limits Mini
 // @namespace    alirezadigi.chatgpt.codex-limits
-// @version      0.11.0
+// @version      0.11.1
 // @description  Shows the remaining 5-hour and weekly limits in the ChatGPT sidebar.
 // @license      MIT
 // @match        https://chatgpt.com/*
@@ -71,7 +71,8 @@
   }
 
   function getProfileButton() {
-    return bestVisible(document.querySelectorAll('[data-testid="accounts-profile-button"]'));
+    return bestVisible([...document.querySelectorAll('[data-testid="accounts-profile-button"]')]
+      .filter(element => element.id !== ROW_ID && !element.closest(`#${ROW_ID}`)));
   }
 
   function getExporterTrigger() {
@@ -101,7 +102,8 @@
         if (attribute.name === 'id' ||
             attribute.name.startsWith('aria-') ||
             attribute.name.startsWith('data-radix') ||
-            attribute.name === 'data-state') {
+            attribute.name === 'data-state' ||
+            attribute.name === 'data-testid') {
           node.removeAttribute(attribute.name);
         }
       }
@@ -175,6 +177,10 @@
     if (!target) return null;
 
     let row = document.getElementById(ROW_ID);
+    if (row && (target.anchor === row || row.contains(target.anchor))) {
+      console.warn('[Usage Limits Mini] Refusing to use its own row as a mount anchor');
+      return row;
+    }
     const correctlyMounted = row?.isConnected &&
       currentMode === target.mode &&
       currentAnchor === target.anchor &&
