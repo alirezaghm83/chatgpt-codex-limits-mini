@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Codex Limits Mini
 // @namespace    alirezadigi.chatgpt.codex-limits
-// @version      0.12.1
+// @version      0.13.0
 // @description  Shows the remaining 5-hour and weekly limits in the ChatGPT sidebar.
 // @license      MIT
 // @match        https://chatgpt.com/*
@@ -65,18 +65,46 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      #${ROW_ID} { appearance:none; cursor:pointer; font:inherit; text-align:inherit; }
-      #${ROW_ID} .clm-content { display:flex; align-items:center; gap:10px; min-width:0; width:100%; }
-      #${ROW_ID} .clm-icon { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; width:18px; height:18px; }
-      #${ROW_ID} .clm-values { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; min-width:0; width:100%; font-variant-numeric:tabular-nums; }
-      #${ROW_ID} .clm-limit { display:flex; flex-direction:column; align-items:flex-start; min-width:0; line-height:1.05; white-space:nowrap; }
-      #${ROW_ID} .clm-main { display:flex; align-items:baseline; gap:4px; font-size:11px; }
-      #${ROW_ID} .clm-label { opacity:.72; font-weight:400; }
-      #${ROW_ID} .clm-remaining { opacity:1; font-weight:700; }
-      #${ROW_ID} .clm-reset { margin-top:3px; font-size:9px; opacity:.42; font-weight:400; }
-      #${ROW_ID} .clm-status { display:flex; align-items:center; min-height:18px; font-size:10px; opacity:.55; }
+      #${ROW_ID} {
+        appearance:none;
+        box-sizing:border-box;
+        width:calc(100% - 0.875rem);
+        min-width:0;
+        height:auto;
+        min-height:58px;
+        margin-block:0 0.5rem;
+        margin-inline:0.5rem 0.375rem;
+        padding:9px 11px;
+        border:0;
+        border-radius:10px;
+        cursor:pointer;
+        font:inherit;
+        color:var(--text-primary, var(--ce-text-primary, currentColor));
+        text-align:inherit;
+        transition:background-color 160ms ease, color 160ms ease;
+      }
+      #${ROW_ID}:hover { background:var(--sidebar-surface-secondary, rgba(127,127,127,.12)); }
+      #${ROW_ID}:focus-visible { outline:2px solid var(--interactive-label-primary-default, #10a37f); outline-offset:-2px; }
+      #${ROW_ID} .clm-content { display:flex; align-items:center; gap:12px; min-width:0; width:100%; }
+      #${ROW_ID} .clm-icon { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; width:20px; height:20px; opacity:.9; }
+      #${ROW_ID} .clm-icon svg { width:20px; height:20px; }
+      #${ROW_ID} .clm-values { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:start; gap:14px; min-width:0; width:100%; font-variant-numeric:tabular-nums; }
+      #${ROW_ID} .clm-limit { display:flex; flex-direction:column; align-items:stretch; min-width:0; line-height:1.15; white-space:nowrap; --clm-accent:#10a37f; }
+      #${ROW_ID} .clm-limit[data-tone="low"] { --clm-accent:#d97706; }
+      #${ROW_ID} .clm-limit[data-tone="critical"] { --clm-accent:#dc2626; }
+      #${ROW_ID} .clm-main { display:flex; align-items:baseline; justify-content:space-between; gap:6px; min-width:0; font-size:13px; }
+      #${ROW_ID} .clm-label { overflow:hidden; text-overflow:ellipsis; opacity:.82; font-weight:500; }
+      #${ROW_ID} .clm-remaining { flex:0 0 auto; opacity:1; font-size:13.5px; font-weight:750; letter-spacing:-.01em; color:var(--text-primary, currentColor); }
+      #${ROW_ID} .clm-progress { display:block; position:relative; overflow:hidden; width:100%; height:4px; margin-top:6px; border-radius:999px; background:rgba(127,127,127,.2); }
+      #${ROW_ID} .clm-progress-fill { display:block; width:0; height:100%; border-radius:inherit; background:var(--clm-accent); transition:width 280ms ease, background-color 180ms ease; }
+      #${ROW_ID} .clm-reset { margin-top:5px; overflow:hidden; text-overflow:ellipsis; font-size:10.5px; line-height:1.15; opacity:.58; font-weight:400; }
+      #${ROW_ID} .clm-status { display:flex; align-items:center; min-height:28px; font-size:12px; opacity:.68; }
       #${ROW_ID}.clm-collapsed .clm-values,
       #${ROW_ID}.clm-collapsed .clm-status { display:none !important; }
+      #${ROW_ID}.clm-collapsed { width:32px; min-width:32px; height:32px; min-height:32px; margin:0 auto .5rem; padding:0; justify-content:center; border-radius:8px; }
+      #${ROW_ID}.clm-collapsed .clm-content { justify-content:center; gap:0; }
+      #${ROW_ID}.clm-collapsed .clm-icon,
+      #${ROW_ID}.clm-collapsed .clm-icon svg { width:18px; height:18px; }
       #${ROW_ID} [hidden] { display:none !important; }
       #${ROW_ID} .clm-spinner { display:inline-block; width:10px; height:10px; border:1.5px solid currentColor; border-right-color:transparent; border-radius:50%; animation:clm-spin .7s linear infinite; opacity:.65; }
       @keyframes clm-spin { to { transform:rotate(360deg); } }
@@ -177,9 +205,21 @@
     const reset = document.createElement('span');
     reset.className = 'clm-reset';
     reset.textContent = '↻ —';
+
+    const progress = document.createElement('span');
+    progress.className = 'clm-progress';
+    progress.setAttribute('role', 'progressbar');
+    progress.setAttribute('aria-label', `${label} remaining`);
+    progress.setAttribute('aria-valuemin', '0');
+    progress.setAttribute('aria-valuemax', '100');
+
+    const progressFill = document.createElement('span');
+    progressFill.className = 'clm-progress-fill';
+    progress.append(progressFill);
+
     main.append(labelNode, remaining);
-    root.append(main, reset);
-    return { root, remaining, reset };
+    root.append(main, progress, reset);
+    return { root, remaining, reset, progress, progressFill };
   }
 
   function applySourceAppearance(row, source, mode) {
@@ -253,9 +293,30 @@
       : 'Reset time unavailable';
   }
 
+  function progressTone(value) {
+    if (!Number.isFinite(value)) return 'unknown';
+    if (value <= 20) return 'critical';
+    if (value <= 50) return 'low';
+    return 'healthy';
+  }
+
   function renderLimit(uiLimit, usageWindow, now) {
-    setText(uiLimit.remaining, formatRemaining(usageWindow?.remaining));
+    const remaining = usageWindow?.remaining;
+    setText(uiLimit.remaining, formatRemaining(remaining));
     setText(uiLimit.reset, formatCountdown(usageWindow?.resetAt, now));
+    uiLimit.root.dataset.tone = progressTone(remaining);
+    const progressValue = Number.isFinite(remaining)
+      ? Math.max(0, Math.min(100, remaining))
+      : 0;
+    const progressWidth = `${progressValue}%`;
+    if (uiLimit.progressFill.style.width !== progressWidth) {
+      uiLimit.progressFill.style.width = progressWidth;
+    }
+    if (Number.isFinite(remaining)) {
+      uiLimit.progress.setAttribute('aria-valuenow', String(progressValue));
+    } else {
+      uiLimit.progress.removeAttribute('aria-valuenow');
+    }
     const title = resetTitle(usageWindow?.resetAt);
     if (uiLimit.root.title !== title) uiLimit.root.title = title;
   }
@@ -630,6 +691,6 @@
   addInterval(() => fetchUsage(false), CONFIG.REFRESH_MS);
   addInterval(render, CONFIG.COUNTDOWN_MS);
 
-  window[RUNTIME_KEY] = Object.freeze({ version: '0.12.1', destroy });
+  window[RUNTIME_KEY] = Object.freeze({ version: '0.13.0', destroy });
   reconcile();
 })();

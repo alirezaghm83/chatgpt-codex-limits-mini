@@ -22,6 +22,7 @@ function loadCore() {
   const names = [
     'formatRemaining',
     'formatCountdown',
+    'progressTone',
     'allObjects',
     'firstFinite',
     'windowSeconds',
@@ -44,12 +45,13 @@ function loadCore() {
 }
 
 test('userscript metadata and anti-regression invariants', () => {
-  assert.match(source, /\/\/ @version\s+0\.12\.1/);
+  assert.match(source, /\/\/ @version\s+0\.13\.0/);
   assert.match(source, /@icon\s+data:image\/png;base64,/);
   assert.match(source, /window\[RUNTIME_KEY\]\?\.destroy\?\.\(\)/);
   assert.match(source, /document\.createElement\('button'\)/);
   assert.doesNotMatch(source, /cloneNode\s*\(/);
   assert.doesNotMatch(source, /innerHTML\s*=\s*html/);
+  assert.match(source, /className = 'clm-progress'/);
 });
 
 test('embedded icon is a complete 128x128 PNG', () => {
@@ -67,6 +69,14 @@ test('remaining percentages are rounded without losing integers', () => {
   assert.equal(formatRemaining(68), '68%');
   assert.equal(formatRemaining(68.26), '68.3%');
   assert.equal(formatRemaining(Number.NaN), '—');
+});
+
+test('progress tone reflects remaining capacity', () => {
+  const { progressTone } = loadCore();
+  assert.equal(progressTone(80), 'healthy');
+  assert.equal(progressTone(50), 'low');
+  assert.equal(progressTone(20), 'critical');
+  assert.equal(progressTone(Number.NaN), 'unknown');
 });
 
 test('countdowns use minute, hour, and day precision', () => {

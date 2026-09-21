@@ -9,6 +9,8 @@ A lightweight Tampermonkey userscript that shows the remaining **5-hour** and **
 ## Features
 
 - Shows the remaining percentage in bold for the 5-hour and weekly windows
+- Uses the full Exporter-style sidebar width with larger, higher-contrast typography
+- Shows a remaining-capacity progress bar for each window, with green/amber/red states
 - Shows a muted live reset countdown under each limit (`↻ 2h 14m`, `↻ 3d 8h`)
 - Refreshes usage automatically every 2 minutes
 - Updates countdowns locally without extra API requests
