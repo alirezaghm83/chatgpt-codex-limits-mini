@@ -1,17 +1,23 @@
+<p align="center">
+  <img src="assets/icon-128.png" width="96" height="96" alt="Usage Limits Mini icon">
+</p>
+
 # ChatGPT Codex Limits Mini
 
-A lightweight Tampermonkey userscript that shows remaining **Codex 5-hour** and **weekly** limits directly in the ChatGPT sidebar.
+A lightweight Tampermonkey userscript that shows the remaining **5-hour** and **weekly** limits directly in the ChatGPT sidebar.
 
 ## Features
 
-- Shows remaining Codex usage for the 5-hour and weekly windows
-- Shows a live reset countdown under each limit (`↻ 2h 14m`, `↻ 3d 8h`)
-- Refreshes automatically every 2 minutes
+- Shows the remaining percentage in bold for the 5-hour and weekly windows
+- Shows a muted live reset countdown under each limit (`↻ 2h 14m`, `↻ 3d 8h`)
+- Refreshes usage automatically every 2 minutes
+- Updates countdowns locally without extra API requests
 - Click the row to force-refresh usage
 - Handles ChatGPT sidebar collapse/expand state
-- Integrates visually with **ChatGPT Exporter** when it is installed
+- Integrates visually with **ChatGPT Exporter** when installed
 - Falls back to a standalone native-looking sidebar row when Exporter is absent
 - Avoids triggering Exporter's Radix HoverCard when hovering the limits row
+- Uses idempotent rendering and ignores its own DOM mutations
 
 ## Installation
 
@@ -25,33 +31,32 @@ The script declares the GitHub Raw URL as both `@downloadURL` and `@updateURL`, 
 
 ### Manual install
 
-1. Install Tampermonkey (or another compatible userscript manager).
+1. Install Tampermonkey or another compatible userscript manager.
 2. Open `chatgpt-codex-limits-mini.user.js`.
 3. Create a new userscript and paste the file contents.
 4. Open or refresh ChatGPT.
 
 ## How it works
 
-The script reads the current ChatGPT session, obtains the access token when available, and requests:
+The script reads the current ChatGPT session when available and requests:
 
 ```text
 /backend-api/wham/usage
 ```
 
-It identifies the 5-hour and 7-day rate-limit windows by their `limit_window_seconds` values, converts `used_percent` to remaining percentage, and reads the reset timestamp to maintain a local countdown without extra API requests.
+It identifies the 5-hour and 7-day rate-limit windows by their `limit_window_seconds` values, converts `used_percent` to the remaining percentage, and reads the reset timestamp to maintain a local countdown.
 
-For sidebar placement, the script prefers ChatGPT Exporter's `.ce-nav-trigger` when present so the row inherits the same visual layout. Otherwise it inserts its own row immediately above ChatGPT's profile section.
+For sidebar placement, the script prefers ChatGPT Exporter's `.ce-nav-trigger` when present so the row inherits the same outer layout. Otherwise it inserts a native-looking row immediately above ChatGPT's profile section. The row's inner content is rebuilt from scratch so profile names and unrelated account text are never copied into it.
 
 ## Compatibility notes
 
 This project depends on undocumented ChatGPT frontend/API behavior and can break when ChatGPT changes its DOM or backend endpoints.
 
-The Exporter integration currently relies on selectors/classes including:
+The integration currently relies on selectors/classes including:
 
 ```text
 .ce-nav-trigger
 .ce-nav-trigger-collapsed
-.ce-menu-item-text
 [data-testid="accounts-profile-button"]
 ```
 
