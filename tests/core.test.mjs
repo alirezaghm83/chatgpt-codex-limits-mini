@@ -45,7 +45,7 @@ function loadCore() {
 }
 
 test('userscript metadata and anti-regression invariants', () => {
-  assert.match(source, /\/\/ @version\s+0\.13\.1/);
+  assert.match(source, /\/\/ @version\s+0\.13\.2/);
   assert.match(source, /@icon\s+data:image\/png;base64,/);
   assert.match(source, /window\[RUNTIME_KEY\]\?\.destroy\?\.\(\)/);
   assert.match(source, /document\.createElement\('button'\)/);
@@ -62,7 +62,8 @@ test('embedded icon exactly matches the checked-in 128x128 favicon', async () =>
   assert.deepEqual([...image.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
   assert.equal(image.readUInt32BE(16), 128);
   assert.equal(image.readUInt32BE(20), 128);
-  assert.equal(image.length, 16_887);
+  assert.equal(image.length, 21_516);
+  assert.equal(image[25], 6, 'embedded icon must be RGBA');
   assert.deepEqual(image, favicon);
 });
 
@@ -78,6 +79,7 @@ test('project icon and favicon variants have their intended PNG dimensions', asy
     assert.deepEqual([...image.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
     assert.equal(image.readUInt32BE(16), size, `${filename} width`);
     assert.equal(image.readUInt32BE(20), size, `${filename} height`);
+    assert.equal(image[25], 6, `${filename} must preserve transparency`);
   }
 });
 
