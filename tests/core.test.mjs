@@ -56,7 +56,7 @@ function loadCore() {
 }
 
 test('userscript metadata and anti-regression invariants', () => {
-  assert.match(source, /\/\/ @version\s+0\.15\.0/);
+  assert.match(source, /\/\/ @version\s+0\.15\.1/);
   assert.match(source, /@icon\s+data:image\/png;base64,/);
   assert.match(source, /window\[RUNTIME_KEY\]\?\.destroy\?\.\(\)/);
   assert.match(source, /document\.createElement\('button'\)/);
@@ -75,6 +75,7 @@ test('userscript metadata and anti-regression invariants', () => {
   assert.match(source, /data-clm-layout="vertical"/);
   assert.match(source, /data-clm-layout="horizontal"/);
   assert.match(source, /data-clm-density="compact"/);
+  assert.match(source, /data-clm-layout="vertical"\] \.clm-content \{ align-items:center; \}/);
   assert.match(source, /addEventListener\('contextmenu'/);
   assert.match(source, /localStorage\.setItem\(HISTORY_STORAGE_KEY/);
   assert.match(source, /recordUsageHistory\(parsed, state\.lastSuccessAt\)/);

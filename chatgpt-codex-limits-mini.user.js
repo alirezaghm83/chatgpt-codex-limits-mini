@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Codex Limits Mini
 // @namespace    alirezadigi.chatgpt.codex-limits
-// @version      0.15.0
+// @version      0.15.1
 // @description  Shows the remaining 5-hour and weekly limits in the ChatGPT sidebar.
 // @license      MIT
 // @match        https://chatgpt.com/*
@@ -109,8 +109,8 @@
       #${ROW_ID} .clm-icon svg { width:20px; height:20px; }
       #${ROW_ID} .clm-values { display:grid; align-items:start; min-width:0; width:100%; font-variant-numeric:tabular-nums; }
       #${ROW_ID}[data-clm-layout="horizontal"] .clm-values { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; }
-      #${ROW_ID}[data-clm-layout="vertical"] .clm-content { align-items:flex-start; }
-      #${ROW_ID}[data-clm-layout="vertical"] .clm-icon { margin-top:1px; }
+      #${ROW_ID}[data-clm-layout="vertical"] .clm-content { align-items:center; }
+      #${ROW_ID}[data-clm-layout="vertical"] .clm-icon { margin-top:0; }
       #${ROW_ID}[data-clm-layout="vertical"] .clm-values { grid-template-columns:minmax(0,1fr); gap:10px; }
       #${ROW_ID}[data-clm-layout="vertical"] .clm-limit + .clm-limit { padding-top:10px; border-top:1px solid rgba(127,127,127,.16); }
       #${ROW_ID}[data-clm-layout="vertical"][data-clm-density="compact"] { padding-block:7px; }
@@ -961,6 +961,6 @@
   addInterval(() => fetchUsage(false), CONFIG.REFRESH_MS);
   addInterval(render, CONFIG.COUNTDOWN_MS);
 
-  window[RUNTIME_KEY] = Object.freeze({ version: '0.15.0', destroy });
+  window[RUNTIME_KEY] = Object.freeze({ version: '0.15.1', destroy });
   reconcile();
 })();
