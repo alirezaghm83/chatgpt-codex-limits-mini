@@ -59,7 +59,8 @@ function loadCore() {
 }
 
 test('userscript metadata and anti-regression invariants', () => {
-  assert.match(source, /\/\/ @version\s+0\.16\.1/);
+  assert.match(source, /\/\/ @version\s+0\.16\.2/);
+  assert.match(source, /version: '0\.16\.2'/);
   assert.match(source, /@icon\s+data:image\/png;base64,/);
   assert.match(source, /window\[RUNTIME_KEY\]\?\.destroy\?\.\(\)/);
   assert.match(source, /document\.createElement\('button'\)/);
