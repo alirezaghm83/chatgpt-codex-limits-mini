@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Codex Limits Mini
 // @namespace    alirezadigi.chatgpt.codex-limits
-// @version      0.16.0
+// @version      0.16.1
 // @description  Shows the remaining 5-hour and weekly limits in the ChatGPT sidebar.
 // @license      MIT
 // @match        https://chatgpt.com/*
@@ -157,6 +157,7 @@
       #${HISTORY_PANEL_ID} .clm-history-card strong { display:block; margin-top:2px; font-size:14px; }
       #${HISTORY_PANEL_ID} .clm-history-list { display:grid; gap:4px; margin:0; padding:0; list-style:none; font-variant-numeric:tabular-nums; }
       #${HISTORY_PANEL_ID} .clm-history-list li { display:grid; grid-template-columns:48px 1fr 1fr; gap:6px; padding:5px 0; border-top:1px solid rgba(127,127,127,.16); }
+      #${HISTORY_PANEL_ID} .clm-history-list .clm-history-list-note { display:block; padding:8px 0 2px; color:inherit; opacity:.68; line-height:1.45; }
       @keyframes clm-spin { to { transform:rotate(360deg); } }
     `;
     document.head.appendChild(style);
@@ -647,6 +648,7 @@
 
     if (history.length > recent.length) {
       const item = document.createElement('li');
+      item.className = 'clm-history-list-note';
       item.textContent = `Showing newest ${recent.length} of ${history.length} saved records. Export CSV includes all records.`;
       list.append(item);
     }
