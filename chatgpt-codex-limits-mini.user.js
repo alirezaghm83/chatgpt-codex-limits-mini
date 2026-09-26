@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Codex Limits Mini
 // @namespace    alirezadigi.chatgpt.codex-limits
-// @version      0.17.0
+// @version      0.16.2
 // @description  Shows the remaining 5-hour and weekly limits in the ChatGPT sidebar.
 // @license      MIT
 // @match        https://chatgpt.com/*
@@ -33,7 +33,7 @@
     HIGHLIGHT_LOWEST: true,
     TONE_LOW_AT_OR_BELOW: 50,
     TONE_CRITICAL_AT_OR_BELOW: 20,
-    REFRESH_MINUTES: 10,
+    REFRESH_MINUTES: 2,
     HISTORY_ENABLED: true,
     HISTORY_RETENTION_DAYS: 14,
     HISTORY_MAX_ENTRIES: 500,
@@ -49,8 +49,6 @@
     COUNTDOWN_MS: 30 * 1000,
     FETCH_TIMEOUT_MS: 15 * 1000,
     TOKEN_FALLBACK_TTL_MS: 4 * 60 * 1000,
-    RATE_LIMIT_BASE_BACKOFF_MS: 15 * 60 * 1000,
-    RATE_LIMIT_MAX_BACKOFF_MS: 60 * 60 * 1000,
     FIVE_HOURS_SECONDS: 5 * 60 * 60,
     WEEK_SECONDS: 7 * 24 * 60 * 60,
   });
@@ -69,8 +67,6 @@
     refreshQueued: false,
     lastAttemptAt: 0,
     lastSuccessAt: 0,
-    rateLimitUntil: 0,
-    rateLimitStreak: 0,
     token: null,
     tokenExpiresAt: 0,
     abortController: null,
@@ -880,13 +876,6 @@
     };
   }
 
-  function retryAfterMs(value, now = Date.now()) {
-    const seconds = Number(value);
-    if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
-    const retryAt = Date.parse(value || '');
-    return Number.isFinite(retryAt) ? Math.max(0, retryAt - now) : 0;
-  }
-
   async function requestUsage(signal) {
     const send = token => {
       const headers = { accept: 'application/json' };
@@ -918,11 +907,6 @@
     }
 
     const now = Date.now();
-    if (now < state.rateLimitUntil) {
-      state.error = new Error('usage rate limited');
-      render();
-      return;
-    }
     if (!force && now - state.lastAttemptAt < CONFIG.REFRESH_MS) return;
     state.lastAttemptAt = now;
     state.isFetching = true;
@@ -935,18 +919,6 @@
 
     try {
       const response = await requestUsage(controller.signal);
-      if (response.status === 429) {
-        state.rateLimitStreak += 1;
-        const exponentialDelay = Math.min(
-          CONFIG.RATE_LIMIT_MAX_BACKOFF_MS,
-          CONFIG.RATE_LIMIT_BASE_BACKOFF_MS * 2 ** (state.rateLimitStreak - 1),
-        );
-        const serverDelay = retryAfterMs(response.headers.get('retry-after'));
-        state.rateLimitUntil = Date.now() + Math.max(exponentialDelay, serverDelay);
-      } else if (response.ok) {
-        state.rateLimitStreak = 0;
-        state.rateLimitUntil = 0;
-      }
       if (!response.ok) throw new Error(`usage ${response.status}`);
 
       const parsed = parseUsage(await response.json());
@@ -1040,6 +1012,6 @@
   addInterval(() => fetchUsage(false), CONFIG.REFRESH_MS);
   addInterval(render, CONFIG.COUNTDOWN_MS);
 
-  window[RUNTIME_KEY] = Object.freeze({ version: '0.17.0', destroy });
+  window[RUNTIME_KEY] = Object.freeze({ version: '0.16.2', destroy });
   reconcile();
 })();

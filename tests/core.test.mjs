@@ -37,7 +37,6 @@ function loadCore() {
     'resetAt',
     'findWindow',
     'parseUsage',
-    'retryAfterMs',
   ];
   const code = `
     const CONFIG = {
@@ -60,8 +59,8 @@ function loadCore() {
 }
 
 test('userscript metadata and anti-regression invariants', () => {
-  assert.match(source, /\/\/ @version\s+0\.17\.0/);
-  assert.match(source, /version: '0\.17\.0'/);
+  assert.match(source, /\/\/ @version\s+0\.16\.2/);
+  assert.match(source, /version: '0\.16\.2'/);
   assert.match(source, /@icon\s+data:image\/png;base64,/);
   assert.match(source, /window\[RUNTIME_KEY\]\?\.destroy\?\.\(\)/);
   assert.match(source, /document\.createElement\('button'\)/);
@@ -73,9 +72,6 @@ test('userscript metadata and anti-regression invariants', () => {
   assert.match(source, /VERTICAL_DENSITY: 'compact'/);
   assert.match(source, /DISPLAY_MODE: 'full'/);
   assert.match(source, /HISTORY_ENABLED: true/);
-  assert.match(source, /REFRESH_MINUTES: 10/);
-  assert.match(source, /response\.status === 429/);
-  assert.match(source, /RATE_LIMIT_BASE_BACKOFF_MS/);
   assert.match(source, /HISTORY_PANEL_ENTRIES: 25/);
   assert.match(source, /row\.dataset\.clmLayout = SETTINGS\.LAYOUT === 'horizontal'/);
   assert.match(source, /row\.dataset\.clmDensity = SETTINGS\.VERTICAL_DENSITY === 'comfortable'/);
@@ -126,14 +122,6 @@ test('remaining percentages are rounded without losing integers', () => {
   assert.equal(formatRemaining(68), '68%');
   assert.equal(formatRemaining(68.26), '68.3%');
   assert.equal(formatRemaining(Number.NaN), '—');
-});
-
-test('Retry-After supports both seconds and HTTP-date values', () => {
-  const { retryAfterMs } = loadCore();
-  const now = Date.UTC(2026, 8, 26, 6, 30, 0);
-  assert.equal(retryAfterMs('30', now), 30_000);
-  assert.equal(retryAfterMs('Fri, 26 Sep 2026 06:31:00 GMT', now), 60_000);
-  assert.equal(retryAfterMs('invalid', now), 0);
 });
 
 test('progress tone reflects remaining capacity', () => {
