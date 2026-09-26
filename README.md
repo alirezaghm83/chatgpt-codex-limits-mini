@@ -18,7 +18,7 @@ A lightweight Tampermonkey userscript that shows the remaining **5-hour** and **
 - Uses detailed hover text for remaining/used percentage, exact reset time, and freshness
 - Stores a local-only usage history with retention and sample limits you can configure
 - Right-click the widget to open the local history panel with rate-of-use summaries, recent samples, and CSV export
-- Refreshes usage automatically every 2 minutes
+- Refreshes usage automatically every 10 minutes, with exponential backoff after a 429 response
 - Updates countdowns locally without extra API requests
 - Click the row to force-refresh usage
 - Handles ChatGPT sidebar collapse/expand state
@@ -54,7 +54,7 @@ const SETTINGS = Object.freeze({
   HIGHLIGHT_LOWEST: true,
   TONE_LOW_AT_OR_BELOW: 50,
   TONE_CRITICAL_AT_OR_BELOW: 20,
-  REFRESH_MINUTES: 2,
+  REFRESH_MINUTES: 10,
   HISTORY_ENABLED: true,
   HISTORY_RETENTION_DAYS: 14,
   HISTORY_MAX_ENTRIES: 500,
